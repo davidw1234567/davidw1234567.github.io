@@ -27,7 +27,15 @@
 <!-- Use any element to open/show the overlay navigation menu -->
 <span onclick="openNav()">open</span>
   
-  
+<script>
+function openNav() {
+  document.getElementById("myNav").style.width = "100%";
+}
+
+function closeNav() {
+  document.getElementById("myNav").style.width = "0%";
+}
+</script>  
   
   
 <!--<a href="index.html"><div class="title" style="margin-top: 250px; margin-left: 20px;">ART 338 BFA Senior Studio</div></a>
