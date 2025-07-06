@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>-a-live</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: black; filter: contrast(300%); opacity: 0.7;}
+    canvas { display: block; filter: contrast(150%); opacity: 0.9;}
+  </style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+  let currentBuffer, nextBuffer;
+  let currentPixelSize = Math.floor(Math.random() * 120) + 90;
+  let nextPixelSize = Math.floor(Math.random() * 170) + 120;
+
+  let fadeStartTime = 0;
+  const fadeDuration = 60000; //was 20000
+
+  let currentImg = null;
+  let nextImg = null;
+
+  function setup() {
+    createCanvas(windowWidth, windowHeight);
+    imageMode(CORNER);
+    noSmooth();
+
+    currentBuffer = createGraphics(width, height);
+    nextBuffer = createGraphics(width, height);
+    currentBuffer.noSmooth();
+    nextBuffer.noSmooth();
+
+    loadNewImage(img => {
+      currentImg = img;
+      currentPixelSize = getPixelSizeByTime();
+      pixelateToBuffer(currentBuffer, currentImg, currentPixelSize);
+      scheduleNextImage();
+    });
+  }
+
+  function draw() {
+    let now = millis();
+
+    // Draw the current image fully
+    image(currentBuffer, 0, 0);
+
+    // Fade in the next image
+    if (nextImg && now - fadeStartTime < fadeDuration) {
+      let alpha = map(now - fadeStartTime, 0, fadeDuration, 0, 255);
+      tint(255, alpha);
+      image(nextBuffer, 0, 0);
+      noTint();
+    }
+
+    // Time-of-day tint overlay (smooth blend)
+    let t1 = getTintColorByTime();
+    let t2 = getNextTintColor(t1);
+    let tintBlend = constrain(map(now - fadeStartTime, 0, fadeDuration, 0, 1), 0, 1);
+    let overlay = lerpColor(t1, t2, tintBlend);
+    noStroke();
+    fill(overlay);
+    rect(0, 0, width, height);
+
+    // Finish transition
+    if (nextImg && now - fadeStartTime >= fadeDuration) {
+      [currentBuffer, nextBuffer] = [nextBuffer, currentBuffer];
+      currentPixelSize = nextPixelSize;
+      currentImg = nextImg;
+      nextImg = null;
+      scheduleNextImage();
+    }
+  }
+
+  function scheduleNextImage() {
+    nextPixelSize = getPixelSizeByTime();
+    loadNewImage(img => {
+      nextImg = img;
+      pixelateToBuffer(nextBuffer, nextImg, nextPixelSize);
+      fadeStartTime = millis(); // Start fade immediately
+    });
+  }
+
+  function loadNewImage(callback) {
+    const url = `https://picsum.photos/${width}/${height}`;
+    loadImage(url, img => {
+      callback(img);
+    }, err => {
+      console.error('Failed to load image', err);
+    });
+  }
+
+  function pixelateToBuffer(buffer, sourceImg, pSize) {
+    buffer.image(sourceImg, 0, 0, width, height);
+    buffer.loadPixels();
+    for (let y = 0; y < height; y += pSize) {
+      for (let x = 0; x < width; x += pSize) {
+        let i = 4 * (int(x) + int(y) * width);
+        let r = buffer.pixels[i];
+        let g = buffer.pixels[i + 1];
+        let b = buffer.pixels[i + 2];
+
+        for (let dy = 0; dy < pSize; dy++) {
+          for (let dx = 0; dx < pSize; dx++) {
+            let px = x + dx;
+            let py = y + dy;
+            if (px < width && py < height) {
+              let index = 4 * (px + py * width);
+              buffer.pixels[index] = r;
+              buffer.pixels[index + 1] = g;
+              buffer.pixels[index + 2] = b;
+              buffer.pixels[index + 3] = 255;
+            }
+          }
+        }
+      }
+    }
+    buffer.updatePixels();
+  }
+
+  function getTintColorByTime() {
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const edtHour = (utcHour - 4 + 24) % 24;
+
+    if (edtHour >= 6 && edtHour < 10) {
+      return color(255, 180, 100, 40); // Morning
+    } else if (edtHour >= 10 && edtHour < 17) {
+      return color(120, 180, 255, 30); // Day
+    } else if (edtHour >= 17 && edtHour < 20) {
+      return color(200, 100, 255, 40); // Evening
+    } else {
+      return color(0, 0, 20, 100); // Night
+    }
+  }
+
+  function getNextTintColor(current) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 15); // Predict 15 minutes into the future
+    const utcHour = now.getUTCHours();
+    const edtHour = (utcHour - 4 + 24) % 24;
+
+    if (edtHour >= 6 && edtHour < 10) {
+      return color(255, 180, 100, 40); // Morning
+    } else if (edtHour >= 10 && edtHour < 17) {
+      return color(120, 180, 255, 30); // Day
+    } else if (edtHour >= 17 && edtHour < 20) {
+      return color(200, 100, 255, 40); // Evening
+    } else {
+      return color(0, 0, 20, 100); // Night
+    }
+  }
+
+  function getPixelSizeByTime() {
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const edtHour = (utcHour - 4 + 24) % 24;
+
+    if (edtHour >= 6 && edtHour < 10) {
+      return int(random(40, 80)); // Morning
+    } else if (edtHour >= 10 && edtHour < 17) {
+      return int(random(10, 30)); // Day
+    } else if (edtHour >= 17 && edtHour < 20) {
+      return int(random(30, 60)); // Evening
+    } else {
+      return int(random(60, 100)); // Night
+    }
+  }
+
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+    currentBuffer = createGraphics(width, height);
+    nextBuffer = createGraphics(width, height);
+    currentBuffer.noSmooth();
+    nextBuffer.noSmooth();
+    if (currentImg) pixelateToBuffer(currentBuffer, currentImg, currentPixelSize);
+    if (nextImg) pixelateToBuffer(nextBuffer, nextImg, nextPixelSize);
+  }
+</script>
+</body>
+</html>
