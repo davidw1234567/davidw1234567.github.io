@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>-a-live (Multi-scale Shapes)</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+  let currentBuffer, nextBuffer;
+  let currentImg = null;
+  let nextImg = null;
+
+  let fadeStartTime = 0;
+  const fadeDuration = Math.floor(Math.random() * 10000) + 5000;
+
+  function setup() {
+    pixelDensity(1);
+    createCanvas(windowWidth, windowHeight);
+    imageMode(CORNER);
+    noSmooth();
+
+    currentBuffer = createGraphics(width, height);
+    nextBuffer = createGraphics(width, height);
+    currentBuffer.noSmooth();
+    nextBuffer.noSmooth();
+
+    loadNewImage(img => {
+      currentImg = img;
+      pixelateToBuffer(currentBuffer, currentImg);
+      scheduleNextImage();
+    });
+  }
+
+  function draw() {
+    let now = millis();
+
+    image(currentBuffer, 0, 0);
+
+    if (nextImg && now - fadeStartTime < fadeDuration) {
+      let alpha = map(now - fadeStartTime, 0, fadeDuration, 0, 255);
+      tint(255, alpha);
+      image(nextBuffer, 0, 0);
+      noTint();
+    }
+
+    let t1 = getTintColorByTime();
+    let t2 = getNextTintColor(t1);
+    let tintBlend = constrain(map(now - fadeStartTime, 0, fadeDuration, 0, 1), 0, 1);
+    let overlay = lerpColor(t1, t2, tintBlend);
+    noStroke();
+    fill(overlay);
+    rect(0, 0, width, height);
+
+    if (nextImg && now - fadeStartTime >= fadeDuration) {
+      [currentBuffer, nextBuffer] = [nextBuffer, currentBuffer];
+      currentImg = nextImg;
+      nextImg = null;
+      scheduleNextImage();
+    }
+  }
+
+  function scheduleNextImage() {
+    loadNewImage(img => {
+      nextImg = img;
+      pixelateToBuffer(nextBuffer, nextImg);
+      fadeStartTime = millis();
+    });
+  }
+
+  function loadNewImage(callback) {
+    const url = `https://picsum.photos/${width}/${height}`;
+    loadImage(url, img => {
+      callback(img);
+    }, err => {
+      console.error('Failed to load image', err);
+    });
+  }
+
+  function pixelateToBuffer(buffer, sourceImg) {
+    buffer.clear();
+    buffer.noStroke();
+
+    const minSize = 20;
+    const maxSize = 300;
+    const density = 0.12; // lower = more sparse, higher = more crowded
+
+    for (let i = 0; i < width * height * density / 1000; i++) {
+      const pSize = Math.floor(random(minSize, maxSize));
+      const x = Math.floor(random(0, width));
+      const y = Math.floor(random(0, height));
+      const col = sourceImg.get(x, y);
+
+      buffer.fill(col);
+
+      const centerX = x;
+      const centerY = y;
+
+      let numPoints = Math.floor(random(5, 10));
+      let radiusBase = pSize * random(0.8, 1.5);
+
+      buffer.beginShape();
+      for (let j = 0; j < numPoints; j++) {
+        let angle = TWO_PI * (j / numPoints);
+        let radius = radiusBase * random(0.5, 1.1);
+        let sx = centerX + cos(angle) * radius;
+        let sy = centerY + sin(angle) * radius;
+        buffer.vertex(sx, sy);
+      }
+      buffer.endShape(CLOSE);
+    }
+  }
+
+  function getTintColorByTime() {
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const edtHour = (utcHour - 4 + 24) % 24;
+
+    if (edtHour >= 6 && edtHour < 10) {
+      return color(255, 180, 100, 40);
+    } else if (edtHour >= 10 && edtHour < 17) {
+      return color(120, 180, 255, 30);
+    } else if (edtHour >= 17 && edtHour < 20) {
+      return color(200, 100, 255, 40);
+    } else {
+      return color(0, 0, 20, 100);
+    }
+  }
+
+  function getNextTintColor(current) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 15);
+    const utcHour = now.getUTCHours();
+    const edtHour = (utcHour - 4 + 24) % 24;
+
+    if (edtHour >= 6 && edtHour < 10) {
+      return color(255, 180, 100, 40);
+    } else if (edtHour >= 10 && edtHour < 17) {
+      return color(120, 180, 255, 30);
+    } else if (edtHour >= 17 && edtHour < 20) {
+      return color(200, 100, 255, 40);
+    } else {
+      return color(0, 0, 20, 100);
+    }
+  }
+
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+    currentBuffer = createGraphics(width, height);
+    nextBuffer = createGraphics(width, height);
+    currentBuffer.noSmooth();
+    nextBuffer.noSmooth();
+    if (currentImg) pixelateToBuffer(currentBuffer, currentImg);
+    if (nextImg) pixelateToBuffer(nextBuffer, nextImg);
+  }
+</script>
+</body>
+</html>
